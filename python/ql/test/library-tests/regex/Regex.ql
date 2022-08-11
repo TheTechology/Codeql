@@ -6,6 +6,10 @@ predicate part(Regex r, int start, int end, string kind) {
   or
   r.normalCharacter(start, end) and kind = "char"
   or
+  r.escapedCharacter(start, end) and
+  kind = "char" and
+  not r.specialCharacter(start, end, _)
+  or
   r.specialCharacter(start, end, kind)
   or
   r.sequence(start, end) and kind = "sequence"
@@ -16,7 +20,7 @@ predicate part(Regex r, int start, int end, string kind) {
   or
   r.group(start, end) and not r.zeroWidthMatch(start, end) and kind = "non-empty group"
   or
-  r.qualifiedItem(start, end, _) and kind = "qualified"
+  r.qualifiedItem(start, end, _, _) and kind = "qualified"
 }
 
 from Regex r, int start, int end, string kind

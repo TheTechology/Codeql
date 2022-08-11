@@ -4,6 +4,7 @@
 
 import python
 import semmle.python.pointsto.PointsTo
+import IDEContextual
 
 private newtype TDefinition =
   TLocalDefinition(AstNode a) { a instanceof Expr or a instanceof Stmt or a instanceof Module }
@@ -466,17 +467,17 @@ Definition getUniqueDefinition(Expr use) {
   not result = TLocalDefinition(use)
 }
 
-/** Helper class to get suitable locations for attributes */
-class NiceLocationExpr extends @py_expr {
+/** A helper class to get suitable locations for attributes */
+class NiceLocationExpr extends Expr {
   /** Gets a textual representation of this element. */
-  string toString() { result = this.(Expr).toString() }
+  override string toString() { result = this.(Expr).toString() }
 
   /**
    * Holds if this element is at the specified location.
    * The location spans column `bc` of line `bl` to
    * column `ec` of line `el` in file `f`.
    * For more information, see
-   * [Locations](https://help.semmle.com/QL/learn-ql/ql/locations.html).
+   * [Locations](https://codeql.github.com/docs/writing-codeql-queries/providing-locations-in-codeql-queries/).
    */
   predicate hasLocationInfo(string f, int bl, int bc, int el, int ec) {
     /* Attribute location for x.y is that of 'y' so that url does not overlap with that of 'x' */
@@ -513,11 +514,3 @@ Definition definitionOf(NiceLocationExpr use, string kind) {
     not result.getLocation().hasLocationInfo(f, l, _, _, _)
   )
 }
-
-/**
- * Returns an appropriately encoded version of a filename `name`
- * passed by the VS Code extension in order to coincide with the
- * output of `.getFile()` on locatable entities.
- */
-cached
-File getEncodedFile(string name) { result.getAbsolutePath().replaceAll(":", "_") = name }

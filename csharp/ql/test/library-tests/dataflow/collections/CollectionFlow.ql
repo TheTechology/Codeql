@@ -12,10 +12,12 @@ class Conf extends DataFlow::Configuration {
 
   override predicate isSink(DataFlow::Node sink) {
     exists(MethodCall mc |
-      mc.getTarget().hasName("Sink") and
+      mc.getTarget().hasUndecoratedName("Sink") and
       mc.getAnArgument() = sink.asExpr()
     )
   }
+
+  override int fieldFlowBranchLimit() { result = 10 }
 }
 
 from DataFlow::PathNode source, DataFlow::PathNode sink, Conf conf

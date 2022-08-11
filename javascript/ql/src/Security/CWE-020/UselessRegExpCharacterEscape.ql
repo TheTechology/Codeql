@@ -5,11 +5,12 @@
  *              behave unexpectedly.
  * @kind problem
  * @problem.severity error
+ * @security-severity 7.8
  * @precision high
  * @id js/useless-regexp-character-escape
  * @tags correctness
  *       security
- *       external/cwe/cwe-20
+ *       external/cwe/cwe-020
  */
 
 import javascript
@@ -66,7 +67,7 @@ class RegExpPatternMistake extends TRegExpPatternMistake {
    * The location spans column `startcolumn` of line `startline` to
    * column `endcolumn` of line `endline` in file `filepath`.
    * For more information, see
-   * [Locations](https://help.semmle.com/QL/learn-ql/ql/locations.html).
+   * [Locations](https://codeql.github.com/docs/writing-codeql-queries/providing-locations-in-codeql-queries/).
    */
   predicate hasLocationInfo(
     string filepath, int startline, int startcolumn, int endline, int endcolumn

@@ -1,14 +1,14 @@
 /**
  * @name Missing `MessageEvent.origin` verification in `postMessage` handlers
  * @description Missing the `MessageEvent.origin` verification in `postMessage` handlers, allows any windows to send arbitrary data to the `MessageEvent` listener.
- * This could lead to unexpected behaviour, especially when `MessageEvent.data` is used in an unsafe way.
+ * This could lead to unexpected behavior, especially when `MessageEvent.data` is used in an unsafe way.
  * @kind problem
  * @problem.severity warning
  * @precision high
  * @id js/missing-postmessageorigin-verification
  * @tags correctness
  *       security
- *       external/cwe/cwe-20
+ *       external/cwe/cwe-020
  */
 
 import javascript
@@ -53,9 +53,7 @@ class PostMessageEvent extends DataFlow::SourceNode {
    * Holds if there is an insufficient method call (i.e indexOf) used to verify `MessageEvent.origin`
    */
   predicate hasOriginInsufficientlyChecked() {
-    exists(InsufficientOriginChecks insufficientChecks |
-      this.getAPropertyRead("origin").getAMethodCall*() = insufficientChecks
-    )
+    this.getAPropertyRead("origin").getAMethodCall*() instanceof InsufficientOriginChecks
   }
 }
 

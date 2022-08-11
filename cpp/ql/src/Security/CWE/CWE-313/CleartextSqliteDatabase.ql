@@ -4,6 +4,7 @@
  *              database can expose it to an attacker.
  * @kind path-problem
  * @problem.severity warning
+ * @security-severity 7.5
  * @precision medium
  * @id cpp/cleartext-storage-database
  * @tags security
@@ -28,12 +29,16 @@ class SqliteFunctionCall extends FunctionCall {
 }
 
 predicate sqlite_encryption_used() {
-  any(StringLiteral l).getValue().toLowerCase().regexpMatch("pragma key.*") or
+  any(StringLiteral l).getValue().toLowerCase().matches("pragma key%") or
   any(StringLiteral l).getValue().toLowerCase().matches("%attach%database%key%") or
   any(FunctionCall fc).getTarget().getName().matches("sqlite%\\_key\\_%")
 }
 
 class Configuration extends TaintTrackingConfiguration {
+  override predicate isSource(Expr source) {
+    super.isSource(source) and source instanceof SensitiveExpr
+  }
+
   override predicate isSink(Element taintedArg) {
     exists(SqliteFunctionCall sqliteCall |
       taintedArg = sqliteCall.getASource() and

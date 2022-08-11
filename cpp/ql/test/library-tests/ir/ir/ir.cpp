@@ -997,7 +997,7 @@ int PointerDecay(int a[], int fn(float)) {
   return a[0] + fn(1.0);
 }
 
-int ExprStmt(int b, int y, int z) {
+int StmtExpr(int b, int y, int z) {
   int x = ({
     int w;
     if (b) {
@@ -1320,6 +1320,353 @@ void *operator new(size_t, void *) noexcept;
 void f(int* p)
 {
   new (p) int;
+}
+
+template<typename T>
+T defaultConstruct() {
+    return T();
+}
+
+class constructor_only {
+public:
+    int x;
+
+public:
+    constructor_only(int x);
+};
+
+class copy_constructor {
+public:
+    int y;
+
+public:
+    copy_constructor();
+    copy_constructor(const copy_constructor&);
+
+    void method();
+};
+
+class destructor_only {
+public:
+    ~destructor_only();
+
+    void method();
+};
+
+template<typename T>
+void acceptRef(const T& v);
+
+template<typename T>
+void acceptValue(T v);
+
+template<typename T>
+T returnValue();
+
+void temporary_string() {
+    String s = returnValue<String>();  // No temporary
+    const String& rs = returnValue<String>();  // Binding a reference variable to a temporary
+
+    acceptRef(s);  // No temporary
+    acceptRef<String>("foo");  // Binding a const reference to a temporary
+    acceptValue(s);
+    acceptValue<String>("foo");
+    String().c_str();
+    returnValue<String>().c_str();  // Member access on a temporary
+
+    defaultConstruct<String>();
+}
+
+void temporary_destructor_only() {
+    destructor_only d = returnValue<destructor_only>();
+    const destructor_only& rd = returnValue<destructor_only>();
+    destructor_only d2;
+    acceptRef(d);
+    acceptValue(d);
+    destructor_only().method();
+    returnValue<destructor_only>().method();
+
+    defaultConstruct<destructor_only>();
+}
+
+void temporary_copy_constructor() {
+    copy_constructor d = returnValue<copy_constructor>();
+    const copy_constructor& rd = returnValue<copy_constructor>();
+    copy_constructor d2;
+    acceptRef(d);
+    acceptValue(d);
+    copy_constructor().method();
+    returnValue<copy_constructor>().method();
+    defaultConstruct<copy_constructor>();
+
+    int y = returnValue<copy_constructor>().y;
+}
+
+void temporary_point() {
+    Point p = returnValue<Point>();  // No temporary
+    const Point& rp = returnValue<Point>();  // Binding a reference variable to a temporary
+
+    acceptRef(p);  // No temporary
+    acceptValue(p);
+    Point().x;
+    int y = returnValue<Point>().y;
+
+    defaultConstruct<Point>();
+}
+
+struct UnusualFields {
+    int& r;
+    float a[10];
+};
+
+void temporary_unusual_fields() {
+    const int& rx = returnValue<UnusualFields>().r;
+    int x = returnValue<UnusualFields>().r;
+
+    const float& rf = returnValue<UnusualFields>().a[3];
+    float f = returnValue<UnusualFields>().a[5];
+}
+
+struct POD_Base {
+    int x;
+
+    float f() const;
+};
+
+struct POD_Middle : POD_Base {
+    int y;
+};
+
+struct POD_Derived : POD_Middle {
+    int z;
+};
+
+void temporary_hierarchy() {
+    POD_Base b = returnValue<POD_Middle>();
+    b = (returnValue<POD_Derived>());  // Multiple conversions plus parens
+    int x = returnValue<POD_Derived>().x;
+    float f = (returnValue<POD_Derived>()).f();
+}
+
+struct Inheritance_Test_B {
+  ~Inheritance_Test_B() {}
+};
+
+struct Inheritance_Test_A : public Inheritance_Test_B {
+  int x;
+  int y;
+  Inheritance_Test_A() : x(42) {
+    y = 3;
+  }
+};
+
+void array_structured_binding() {
+    int xs[2] = {1, 2};
+    // structured binding use
+    {
+        auto& [x0, x1] = xs;
+        x1 = 3;
+        int &rx1 = x1;
+        int x = x1;
+    }
+    // explicit reference version
+    {
+        auto& unnamed_local_variable = xs;
+        auto& x0 = unnamed_local_variable[0];
+        auto& x1 = unnamed_local_variable[1];
+        x1 = 3;
+        int &rx1 = x1;
+        int x = x1;
+    }
+}
+
+struct StructuredBindingDataMemberMemberStruct {
+    int x = 5;
+};
+
+struct StructuredBindingDataMemberStruct {
+    typedef int ArrayType[2];
+    typedef int &RefType;
+    int i = 1;
+    double d = 2.0;
+    unsigned int b : 3;
+    int& r = i;
+    int* p = &i;
+    ArrayType xs = {1, 2};
+    RefType r_alt = i;
+    StructuredBindingDataMemberMemberStruct m;
+};
+
+void data_member_structured_binding() {
+    StructuredBindingDataMemberStruct s;
+    // structured binding use
+    {
+        auto [i, d, b, r, p, xs, r_alt, m] = s;
+        d = 4.0;
+        double& rd = d;
+        int v = i;
+        r = 5;
+        *p = 6;
+        int& rr = r;
+        int* pr = &r;
+        int w = r;
+    }
+    // explicit reference version
+    {
+        auto unnamed_local_variable = s;
+        auto& i = unnamed_local_variable.i;
+        auto& d = unnamed_local_variable.d;
+        // no equivalent for b
+        auto& r = unnamed_local_variable.r;
+        auto& p = unnamed_local_variable.p;
+        d = 4.0;
+        double& rd = d;
+        int v = i;
+        r = 5;
+        *p = 6;
+        int& rr = r;
+        int* pr = &r;
+        int w = r;
+    }
+}
+
+namespace std {
+    template<typename T>
+    struct tuple_size;
+    template<int, typename T>
+    struct tuple_element;
+}
+
+struct StructuredBindingTupleRefGet {
+    int i = 1;
+    double d = 2.2;
+    int& r = i;
+
+    template<int i>
+    typename std::tuple_element<i, StructuredBindingTupleRefGet>::type& get();
+};
+
+template<>
+struct std::tuple_size<StructuredBindingTupleRefGet> {
+    static const unsigned int value = 3;
+};
+
+template<>
+struct std::tuple_element<0, StructuredBindingTupleRefGet> {
+    using type = int;
+};
+template<>
+struct std::tuple_element<1, StructuredBindingTupleRefGet> {
+    using type = double;
+};
+template<>
+struct std::tuple_element<2, StructuredBindingTupleRefGet> {
+    using type = int&;
+};
+
+template<>
+std::tuple_element<0, StructuredBindingTupleRefGet>::type& StructuredBindingTupleRefGet::get<0>() {
+    return i;
+}
+template<>
+std::tuple_element<1, StructuredBindingTupleRefGet>::type& StructuredBindingTupleRefGet::get<1>() {
+    return d;
+}
+template<>
+std::tuple_element<2, StructuredBindingTupleRefGet>::type& StructuredBindingTupleRefGet::get<2>() {
+    return r;
+}
+
+void tuple_structured_binding_ref_get() {
+    StructuredBindingTupleRefGet t;
+    // structured binding use
+    {
+        auto [i, d, r] = t;
+        d = 4.0;
+        double& rd = d;
+        int v = i;
+        r = 5;
+        int& rr = r;
+        int w = r;
+    }
+    // explicit reference version
+    {
+        auto unnamed_local_variable = t;
+        auto& i = unnamed_local_variable.get<0>();
+        auto& d = unnamed_local_variable.get<1>();
+        auto& r = unnamed_local_variable.get<2>();
+        d = 4.0;
+        double& rd = d;
+        int v = i;
+        r = 5;
+        int& rr = r;
+        int w = r;
+    }
+}
+
+struct StructuredBindingTupleNoRefGet {
+    int i = 1;
+    int& r = i;
+
+    template<int i>
+    typename std::tuple_element<i, StructuredBindingTupleNoRefGet>::type get();
+};
+
+template<>
+struct std::tuple_size<StructuredBindingTupleNoRefGet> {
+    static const unsigned int value = 3;
+};
+
+template<>
+struct std::tuple_element<0, StructuredBindingTupleNoRefGet> {
+    using type = int;
+};
+template<>
+struct std::tuple_element<1, StructuredBindingTupleNoRefGet> {
+    using type = int&;
+};
+template<>
+struct std::tuple_element<2, StructuredBindingTupleNoRefGet> {
+    using type = int&&;
+};
+
+template<>
+std::tuple_element<0, StructuredBindingTupleNoRefGet>::type StructuredBindingTupleNoRefGet::get<0>() {
+    return i;
+}
+template<>
+std::tuple_element<1, StructuredBindingTupleNoRefGet>::type StructuredBindingTupleNoRefGet::get<1>() {
+    return r;
+}
+template<>
+std::tuple_element<2, StructuredBindingTupleNoRefGet>::type StructuredBindingTupleNoRefGet::get<2>() {
+    return 5;
+}
+
+void tuple_structured_binding_no_ref_get() {
+    StructuredBindingTupleNoRefGet t;
+    //structured binding use
+    {
+        auto&& [i, r, rv] = t;
+        i = 4;
+        int& ri = i;
+        int v = i;
+        r = 5;
+        int& rr = r;
+        int w = r;
+    }
+    // explicit reference version
+    {
+        auto&& unnamed_local_variable = t;
+        auto&& i = unnamed_local_variable.get<0>();
+        auto& r = unnamed_local_variable.get<1>();
+        auto&& rv = unnamed_local_variable.get<2>();
+        i = 4;
+        int& ri = i;
+        int v = i;
+        r = 5;
+        int& rr = r;
+        int w = r;
+    }
 }
 
 // semmle-extractor-options: -std=c++17 --clang
