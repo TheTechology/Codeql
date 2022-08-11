@@ -41,12 +41,70 @@ public class FileExtractor {
   public static final Pattern JSON_OBJECT_START =
       Pattern.compile("^(?s)\\s*\\{\\s*\"([^\"]|\\\\.)*\"\\s*:.*");
 
-  /** The charset for decoding UTF-8 strings. */
-  private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
+  /**
+   * Returns true if the byte sequence contains invalid UTF-8 or unprintable ASCII characters.
+   */
+  private static boolean hasUnprintableUtf8(byte[] bytes, int length) {
+    // Constants for bytes with N high-order 1-bits.
+    // They are typed as `int` as the subsequent byte-to-int promotion would
+    // otherwise fill the high-order `int` bits with 1s.
+    final int high1 = 0b10000000;
+    final int high2 = 0b11000000;
+    final int high3 = 0b11100000;
+    final int high4 = 0b11110000;
+    final int high5 = 0b11111000;
+
+    int startIndex = skipBOM(bytes, length);
+    for (int i = startIndex; i < length; ++i) {
+      int b = bytes[i];
+      if ((b & high1) == 0) { // 0xxxxxxx is an ASCII character
+        // ASCII values 0-31 are unprintable, except 9-13 are whitespace.
+        // 127 is the unprintable DEL character.
+        if (b <= 8 || 14 <= b && b <= 31 || b == 127) {
+          return true;
+        }
+      } else {
+        // Check for malformed UTF-8 multibyte code point
+        int trailingBytes = 0;
+        if ((b & high3) == high2) {
+          trailingBytes = 1; // 110xxxxx 10xxxxxx
+        } else if ((b & high4) == high3) {
+          trailingBytes = 2; // 1110xxxx 10xxxxxx 10xxxxxx
+        } else if ((b & high5) == high4) {
+          trailingBytes = 3; // 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+        } else {
+          return true; // 10xxxxxx and 11111xxx are not valid here.
+        }
+        // Trailing bytes must be of form 10xxxxxx
+        while (trailingBytes > 0) {
+          ++i;
+          --trailingBytes;
+          if (i >= length) {
+            return false;
+          }
+          if ((bytes[i] & high2) != high1) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Returns the index after the initial BOM, if any, otherwise 0. */
+  private static int skipBOM(byte[] bytes, int length) {
+    if (length >= 2
+        && (bytes[0] == (byte) 0xfe && bytes[1] == (byte) 0xff
+            || bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xfe)) {
+      return 2;
+    } else {
+      return 0;
+    }
+  }
 
   /** Information about supported file types. */
   public static enum FileType {
-    HTML(".htm", ".html", ".xhtm", ".xhtml", ".vue") {
+    HTML(".htm", ".html", ".xhtm", ".xhtml", ".vue", ".hbs", ".ejs", ".njk") {
       @Override
       public IExtractor mkExtractor(ExtractorConfig config, ExtractorState state) {
         return new HTMLExtractor(config, state);
@@ -56,16 +114,28 @@ public class FileExtractor {
       public String toString() {
         return "html";
       }
+
+      @Override
+      protected boolean contains(File f, String lcExt, ExtractorConfig config) {
+        if (isBinaryFile(f, lcExt, config)) {
+          return false;
+        }
+        return super.contains(f, lcExt, config);
+      }
     },
 
-    JS(".js", ".jsx", ".mjs", ".es6", ".es") {
+    JS(".js", ".jsx", ".mjs", ".cjs", ".es6", ".es") {
       @Override
       public IExtractor mkExtractor(ExtractorConfig config, ExtractorState state) {
-        return new ScriptExtractor(config);
+        return new ScriptExtractor(config, state);
       }
 
       @Override
       protected boolean contains(File f, String lcExt, ExtractorConfig config) {
+        if (isBinaryFile(f, lcExt, config)) {
+          return false;
+        }
+
         if (super.contains(f, lcExt, config)) return true;
 
         // detect Node.js scripts that are meant to be run from
@@ -146,9 +216,6 @@ public class FileExtractor {
         return super.contains(f, lcExt, config);
       }
 
-      /** Number of bytes to read from the beginning of a ".ts" file for sniffing its file type. */
-      private static final int fileHeaderSize = 128;
-
       private boolean hasBadFileHeader(File f, String lcExt, ExtractorConfig config) {
         if (!".ts".equals(lcExt)) {
           return false;
@@ -160,7 +227,7 @@ public class FileExtractor {
           if (length == -1) return false;
 
           // Avoid invalid or unprintable UTF-8 files.
-          if (config.getDefaultEncoding().equals("UTF-8") && hasUnprintableUtf8(bytes, length)) {
+          if (config.getDefaultEncoding().equals(StandardCharsets.UTF_8.name()) && hasUnprintableUtf8(bytes, length)) {
             return true;
           }
 
@@ -182,17 +249,6 @@ public class FileExtractor {
         return false;
       }
 
-      /** Returns the index after the initial BOM, if any, otherwise 0. */
-      private int skipBOM(byte[] bytes, int length) {
-        if (length >= 2
-            && (bytes[0] == (byte) 0xfe && bytes[1] == (byte) 0xff
-                || bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xfe)) {
-          return 2;
-        } else {
-          return 0;
-        }
-      }
-
       private boolean isXml(byte[] bytes, int length) {
         int startIndex = skipBOM(bytes, length);
         // Check for `<` encoded in Ascii/UTF-8 or litte-endian UTF-16.
@@ -209,56 +265,6 @@ public class FileExtractor {
       private boolean isTouchstone(byte[] bytes, int length) {
         String s = new String(bytes, 0, length, StandardCharsets.US_ASCII);
         return s.startsWith("! TOUCHSTONE file ") || s.startsWith("[Version] 2.0");
-      }
-
-      /**
-       * Returns true if the byte sequence contains invalid UTF-8 or unprintable ASCII characters.
-       */
-      private boolean hasUnprintableUtf8(byte[] bytes, int length) {
-        // Constants for bytes with N high-order 1-bits.
-        // They are typed as `int` as the subsequent byte-to-int promotion would
-        // otherwise fill the high-order `int` bits with 1s.
-        final int high1 = 0b10000000;
-        final int high2 = 0b11000000;
-        final int high3 = 0b11100000;
-        final int high4 = 0b11110000;
-        final int high5 = 0b11111000;
-
-        int startIndex = skipBOM(bytes, length);
-        for (int i = startIndex; i < length; ++i) {
-          int b = bytes[i];
-          if ((b & high1) == 0) { // 0xxxxxxx is an ASCII character
-            // ASCII values 0-31 are unprintable, except 9-13 are whitespace.
-            // 127 is the unprintable DEL character.
-            if (b <= 8 || 14 <= b && b <= 31 || b == 127) {
-              return true;
-            }
-          } else {
-            // Check for malformed UTF-8 multibyte code point
-            int trailingBytes = 0;
-            if ((b & high3) == high2) {
-              trailingBytes = 1; // 110xxxxx 10xxxxxx
-            } else if ((b & high4) == high3) {
-              trailingBytes = 2; // 1110xxxx 10xxxxxx 10xxxxxx
-            } else if ((b & high5) == high4) {
-              trailingBytes = 3; // 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-            } else {
-              return true; // 10xxxxxx and 11111xxx are not valid here.
-            }
-            // Trailing bytes must be of form 10xxxxxx
-            while (trailingBytes > 0) {
-              ++i;
-              --trailingBytes;
-              if (i >= length) {
-                return false;
-              }
-              if ((bytes[i] & high2) != high1) {
-                return true;
-              }
-            }
-          }
-        }
-        return false;
       }
 
       /**
@@ -288,7 +294,7 @@ public class FileExtractor {
         // Extract the shebang text
         int startOfText = startIndex + "#!".length();
         int lengthOfText = endOfLine - startOfText;
-        String text = new String(bytes, startOfText, lengthOfText, UTF8_CHARSET);
+        String text = new String(bytes, startOfText, lengthOfText, StandardCharsets.UTF_8);
         // Check if the shebang is a recognized JavaScript intepreter.
         return !NODE_INVOCATION.matcher(text).find();
       }
@@ -320,6 +326,9 @@ public class FileExtractor {
         return "yaml";
       }
     };
+
+    /** Number of bytes to read from the beginning of a file to sniff its file type. */
+    private static final int fileHeaderSize = 128;
 
     /** The file extensions (lower-case, including leading dot) corresponding to this file type. */
     private final Set<String> extensions = new LinkedHashSet<String>();
@@ -369,6 +378,29 @@ public class FileExtractor {
      */
     public boolean isTrapCachingAllowed() {
       return true;
+    }
+
+    /** Computes if `f` is a binary file based on whether the initial `fileHeaderSize` bytes are printable UTF-8 chars. */
+    public static boolean isBinaryFile(File f, String lcExt, ExtractorConfig config) {
+      if (!config.getDefaultEncoding().equals(StandardCharsets.UTF_8.name())) {
+        return false;
+      }
+      try (FileInputStream fis = new FileInputStream(f)) {
+        byte[] bytes = new byte[fileHeaderSize];
+        int length = fis.read(bytes);
+
+        if (length == -1) return false;
+
+        // Avoid invalid or unprintable UTF-8 files.
+        if (hasUnprintableUtf8(bytes, length)) {
+          return true;
+        }
+
+        return false;
+      } catch (IOException e) {
+        Exceptions.ignore(e, "Let extractor handle this one.");
+      }
+      return false;
     }
 
     /** The names of all defined {@linkplain FileType}s. */

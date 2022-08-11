@@ -35,7 +35,7 @@ module InstructionConsistency {
       // To avoid an overwhelming number of results when the extractor merges functions with the
       // same name, just pick a single location.
       result =
-        rank[1](Language::Location loc | loc = irFunc.getLocation() | loc order by loc.toString())
+        min(Language::Location loc | loc = irFunc.getLocation() | loc order by loc.toString())
     }
   }
 
@@ -493,5 +493,35 @@ module InstructionConsistency {
           " results for `getEnclosingIRFunction()` in function '$@'." and
       irFunc = getInstructionIRFunction(instr, irFuncText)
     )
+  }
+
+  /**
+   * Holds if the object address operand for the given `FieldAddress` instruction does not have an
+   * address type.
+   */
+  query predicate fieldAddressOnNonPointer(
+    FieldAddressInstruction instr, string message, OptionalIRFunction irFunc, string irFuncText
+  ) {
+    not instr.getObjectAddressOperand().getIRType() instanceof IRAddressType and
+    message =
+      "FieldAddress instruction '" + instr.toString() +
+        "' has an object address operand that is not an address, in function '$@'." and
+    irFunc = getInstructionIRFunction(instr, irFuncText)
+  }
+
+  /**
+   * Holds if the `this` argument operand for the given `Call` instruction does not have an address
+   * type.
+   */
+  query predicate thisArgumentIsNonPointer(
+    CallInstruction instr, string message, OptionalIRFunction irFunc, string irFuncText
+  ) {
+    exists(ThisArgumentOperand thisOperand | thisOperand = instr.getThisArgumentOperand() |
+      not thisOperand.getIRType() instanceof IRAddressType
+    ) and
+    message =
+      "Call instruction '" + instr.toString() +
+        "' has a `this` argument operand that is not an address, in function '$@'." and
+    irFunc = getInstructionIRFunction(instr, irFuncText)
   }
 }

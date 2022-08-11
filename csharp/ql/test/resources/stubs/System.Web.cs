@@ -169,20 +169,22 @@ namespace System.Web
         public HttpServerUtility Server => null;
     }
 
-    public class HttpUtility
-    {
-        public static string HtmlEncode(object value) => null;
-        public static string HtmlEncode(string value) => null;
-        public static string UrlEncode(string value) => null;
-        public static string HtmlAttributeEncode(string value) => null;
-    }
-
     public class HttpCookie
     {
+        public HttpCookie(string name)
+        {
+        }
+
+        public HttpCookie(string name, string value)
+        {
+        }
+
         public string Value { get; set; }
         public NameValueCollection Values => null;
         public string this[string s] { get => null; set { } }
         public bool Secure { get; set; }
+        public bool HttpOnly { get; set; }
+        public System.DateTime Expires { get; set; }
     }
 
     public abstract class HttpCookieCollection : System.Collections.Specialized.NameObjectCollectionBase

@@ -5,6 +5,7 @@
  * @kind problem
  * @id cpp/user-controlled-null-termination-tainted
  * @problem.severity warning
+ * @security-severity 10.0
  * @tags security
  *       external/cwe/cwe-170
  */
@@ -20,11 +21,7 @@ class TaintSource extends VariableAccess {
       this.getTarget() instanceof SemanticStackVariable and
       x.isUserInput(this, cause)
     |
-      cause = "read" or
-      cause = "fread" or
-      cause = "recv" or
-      cause = "recvfrom" or
-      cause = "recvmsg"
+      cause = ["read", "fread", "recv", "recvfrom", "recvmsg"]
     )
   }
 

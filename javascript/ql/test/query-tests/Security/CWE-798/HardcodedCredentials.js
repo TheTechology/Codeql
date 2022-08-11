@@ -238,3 +238,35 @@
       },
     });
 })
+
+(function () {
+    import jwt from "jsonwebtoken";
+
+    var privateKey = "myHardCodedPrivateKey";
+    var token = jwt.sign({ foo: 'bar' }, privateKey, { algorithm: 'RS256'});
+
+    var publicKey = "myHardCodedPublicKey";
+    jwt.verify(token, publicKey, function(err, decoded) {
+        console.log(decoded);
+    });
+})();
+
+(async function () {
+    const fetch = require("node-fetch");
+
+    const rsp = await fetch(ENDPOINT, {
+        method: 'get',
+        headers: new fetch.Headers({
+            "Authorization": `Basic foo`, // OK - dummy password
+            "Content-Type": 'application/json'
+        })
+    });
+
+    const rsp2 = await fetch(ENDPOINT, {
+        method: 'get',
+        headers: new fetch.Headers({
+            "Authorization": `${foo ? 'Bearer' : 'OAuth'} ${accessToken}`, // OK - just a protocol selector
+            "Content-Type": 'application/json'
+        })
+    });
+});
