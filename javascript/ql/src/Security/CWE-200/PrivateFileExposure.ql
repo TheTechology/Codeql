@@ -4,9 +4,12 @@
  *              of private information.
  * @kind problem
  * @problem.severity warning
+ * @security-severity 6.5
  * @id js/exposure-of-private-files
  * @tags security
  *       external/cwe/cwe-200
+ *       external/cwe/cwe-219
+ *       external/cwe/cwe-548
  * @precision high
  */
 
@@ -66,7 +69,7 @@ DataFlow::Node getANodeModulePath(string path) {
  * Gets a folder that contains a `package.json` file.
  */
 pragma[noinline]
-Folder getAPackageJSONFolder() { result = any(PackageJSON json).getFile().getParentContainer() }
+Folder getAPackageJsonFolder() { result = any(PackageJson json).getFile().getParentContainer() }
 
 /**
  * Gets a reference to `dirname`, the home folder, the current working folder, or the root folder.
@@ -79,11 +82,15 @@ Folder getAPackageJSONFolder() { result = any(PackageJSON json).getFile().getPar
  */
 DataFlow::Node getALeakingFolder(string description) {
   exists(ModuleScope ms | result.asExpr() = ms.getVariable("__dirname").getAnAccess()) and
-  result.getFile().getParentContainer() = getAPackageJSONFolder() and
-  description = "the folder " + result.getFile().getParentContainer().getRelativePath()
+  result.getFile().getParentContainer() = getAPackageJsonFolder() and
+  (
+    if result.getFile().getParentContainer().getRelativePath().trim() != ""
+    then description = "the folder " + result.getFile().getParentContainer().getRelativePath()
+    else description = "the source root folder"
+  )
   or
   result = DataFlow::moduleImport("os").getAMemberCall("homedir") and
-  description = "the home folder "
+  description = "the home folder"
   or
   result.mayHaveStringValue("/") and
   description = "the root folder"
@@ -122,8 +129,27 @@ DataFlow::CallNode servesAPrivateFolder(string description) {
   result.getArgument(0) = getAPrivateFolderPath(description)
 }
 
-from Express::RouteSetup setup, string path
+/**
+ * Gets an [`express`](https://npmjs.com/package/express) route-setup
+ * that exposes a private folder described by `path`.
+ */
+Express::RouteSetup getAnExposingExpressSetup(string path) {
+  result.isUseCall() and
+  result.getArgument([0 .. 1]) = servesAPrivateFolder(path).getEnclosingExpr()
+}
+
+/**
+ * Gets a call to [`serve-handler`](https://npmjs.com/package/serve-handler)
+ * that exposes a private folder described by `path`.
+ */
+DataFlow::CallNode getAnExposingServeSetup(string path) {
+  result = DataFlow::moduleImport("serve-handler").getACall() and
+  result.getOptionArgument(2, "public") = getAPrivateFolderPath(path)
+}
+
+from DataFlow::Node node, string path
 where
-  setup.isUseCall() and
-  setup.getArgument([0 .. 1]) = servesAPrivateFolder(path).getEnclosingExpr()
-select setup, "Serves " + path + ", which can contain private information."
+  node = getAnExposingExpressSetup(path).flow()
+  or
+  node = getAnExposingServeSetup(path)
+select node, "Serves " + path + ", which can contain private information."

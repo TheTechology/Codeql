@@ -5,6 +5,7 @@
  *              to SQL Injection.
  * @kind path-problem
  * @problem.severity error
+ * @security-severity 8.8
  * @precision high
  * @id cpp/sql-injection
  * @tags security
@@ -17,20 +18,32 @@ import semmle.code.cpp.security.FunctionWithWrappers
 import semmle.code.cpp.security.TaintTracking
 import TaintedWithPath
 
-class SQLLikeFunction extends FunctionWithWrappers {
-  SQLLikeFunction() { sqlArgument(this.getName(), _) }
+class SqlLikeFunction extends FunctionWithWrappers {
+  SqlLikeFunction() { sqlArgument(this.getName(), _) }
 
   override predicate interestingArg(int arg) { sqlArgument(this.getName(), arg) }
 }
 
 class Configuration extends TaintTrackingConfiguration {
   override predicate isSink(Element tainted) {
-    exists(SQLLikeFunction runSql | runSql.outermostWrapperFunctionCall(tainted, _))
+    exists(SqlLikeFunction runSql | runSql.outermostWrapperFunctionCall(tainted, _))
+  }
+
+  override predicate isBarrier(Expr e) {
+    super.isBarrier(e)
+    or
+    e.getUnspecifiedType() instanceof IntegralType
+    or
+    exists(SqlBarrierFunction sql, int arg, FunctionInput input |
+      e = sql.getACallToThisFunction().getArgument(arg) and
+      input.isParameterDeref(arg) and
+      sql.barrierSqlArgument(input, _)
+    )
   }
 }
 
 from
-  SQLLikeFunction runSql, Expr taintedArg, Expr taintSource, PathNode sourceNode, PathNode sinkNode,
+  SqlLikeFunction runSql, Expr taintedArg, Expr taintSource, PathNode sourceNode, PathNode sinkNode,
   string taintCause, string callChain
 where
   runSql.outermostWrapperFunctionCall(taintedArg, callChain) and

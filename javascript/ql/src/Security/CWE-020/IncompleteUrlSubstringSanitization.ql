@@ -3,11 +3,12 @@
  * @description Security checks on the substrings of an unparsed URL are often vulnerable to bypassing.
  * @kind problem
  * @problem.severity warning
+ * @security-severity 7.8
  * @precision high
  * @id js/incomplete-url-substring-sanitization
  * @tags correctness
  *       security
- *       external/cwe/cwe-20
+ *       external/cwe/cwe-020
  */
 
 import javascript
@@ -38,11 +39,15 @@ where
   (
     // target contains a domain on a common TLD, and perhaps some other URL components
     target
-        .regexpMatch("(?i)([a-z]*:?//)?\\.?([a-z0-9-]+\\.)+" + RegExpPatterns::commonTLD() +
+        .regexpMatch("(?i)([a-z]*:?//)?\\.?([a-z0-9-]+\\.)+" + RegExpPatterns::getACommonTld() +
             "(:[0-9]+)?/?")
     or
     // target is a HTTP URL to a domain on any TLD
     target.regexpMatch("(?i)https?://([a-z0-9-]+\\.)+([a-z]+)(:[0-9]+)?/?")
+    or
+    // target is a HTTP URL to a domain on any TLD with path elements, and the check is an includes check
+    check instanceof StringOps::Includes and
+    target.regexpMatch("(?i)https?://([a-z0-9-]+\\.)+([a-z]+)(:[0-9]+)?/[a-z0-9/_-]+")
   ) and
   (
     if check instanceof StringOps::StartsWith

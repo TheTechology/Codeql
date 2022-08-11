@@ -6,9 +6,11 @@
   prepend --cil
 **/mono*:
 **/dotnet:
-  invoke ${config_dir}/extract-csharp.sh
-/usr/bin/codesign:
+  invoke ${config_dir}/Semmle.Extraction.CSharp.Driver
+  prepend --dotnetexec
+  prepend --cil
+**/msbuild:
+**/xbuild:
   replace yes
-  invoke /usr/bin/env
-  prepend /usr/bin/codesign
-  trace no
+  invoke ${compiler}
+  append /p:UseSharedCompilation=false

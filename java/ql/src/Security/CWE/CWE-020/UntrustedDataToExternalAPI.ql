@@ -5,6 +5,7 @@
  * @kind path-problem
  * @precision low
  * @problem.severity error
+ * @security-severity 7.8
  * @tags security external/cwe/cwe-20
  */
 
@@ -14,8 +15,8 @@ import semmle.code.java.dataflow.TaintTracking
 import semmle.code.java.security.ExternalAPIs
 import DataFlow::PathGraph
 
-from UntrustedDataToExternalAPIConfig config, DataFlow::PathNode source, DataFlow::PathNode sink
+from UntrustedDataToExternalApiConfig config, DataFlow::PathNode source, DataFlow::PathNode sink
 where config.hasFlowPath(source, sink)
 select sink, source, sink,
-  "Call to " + sink.getNode().(ExternalAPIDataNode).getMethodDescription() +
+  "Call to " + sink.getNode().(ExternalApiDataNode).getMethodDescription() +
     " with untrusted data from $@.", source, source.toString()

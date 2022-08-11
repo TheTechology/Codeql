@@ -16,12 +16,12 @@ import definitions
  */
 external string selectedSourceFile();
 
-class Cfg extends PrintASTConfiguration {
+class Cfg extends PrintAstConfiguration {
   /**
    * Holds if the AST for `func` should be printed.
    * Print All functions from the selected file.
    */
   override predicate shouldPrintFunction(Function func) {
-    func.getFile() = getEncodedFile(selectedSourceFile())
+    func.getFile() = getFileBySourceArchiveName(selectedSourceFile())
   }
 }

@@ -62,7 +62,7 @@ module Raw {
     Callable callable, Language::AST ast, TempVariableTag tag, CSharpType type
   ) {
     exists(TranslatedElement element |
-      element.getAST() = ast and
+      element.getAst() = ast and
       callable = element.getFunction() and
       element.hasTempVariable(tag, type)
     )
@@ -105,7 +105,7 @@ module Raw {
       tag = getInstructionTag(instruction) and
       (
         result = element.getInstructionVariable(tag) or
-        result.(IRStringLiteral).getAST() = element.getInstructionStringLiteral(tag)
+        result.(IRStringLiteral).getAst() = element.getInstructionStringLiteral(tag)
       )
     )
   }
@@ -165,10 +165,10 @@ import Cached
 cached
 private module Cached {
   cached
-  Opcode getInstructionOpcode(TRawInstruction instr) {
+  predicate getInstructionOpcode(Opcode opcode, TRawInstruction instr) {
     exists(TranslatedElement element, InstructionTag tag |
       instructionOrigin(instr, element, tag) and
-      element.hasInstruction(result, tag, _)
+      element.hasInstruction(opcode, tag, _)
     )
   }
 
@@ -213,6 +213,23 @@ private module Cached {
     or
     result = getMemoryOperandDefinition(instr, _, _)
   }
+
+  /**
+   * Holds if the partial operand of this `ChiInstruction` updates the bit range
+   * `[startBitOffset, endBitOffset)` of the total operand.
+   */
+  cached
+  predicate getIntervalUpdatedByChi(ChiInstruction chi, int startBit, int endBit) { none() }
+
+  /**
+   * Holds if the operand totally overlaps with its definition and consumes the
+   * bit range `[startBitOffset, endBitOffset)`.
+   */
+  cached
+  predicate getUsedInterval(Operand operand, int startBit, int endBit) { none() }
+
+  cached
+  predicate chiOnlyPartiallyUpdatesLocation(ChiInstruction chi) { none() }
 
   /**
    * Holds if `instr` is part of a cycle in the operand graph that doesn't go
@@ -340,7 +357,7 @@ private module Cached {
     exists(TranslatedElement s, GotoStmt goto |
       goto instanceof GotoStmt and
       not isStrictlyForwardGoto(goto) and
-      goto = s.getAST() and
+      goto = s.getAst() and
       exists(InstructionTag tag |
         result = s.getInstructionSuccessor(tag, kind) and
         instruction = s.getInstruction(tag)
@@ -355,8 +372,14 @@ private module Cached {
   }
 
   cached
-  Language::AST getInstructionAST(Instruction instruction) {
-    result = getInstructionTranslatedElement(instruction).getAST()
+  Language::AST getInstructionAst(Instruction instruction) {
+    result = getInstructionTranslatedElement(instruction).getAst()
+  }
+
+  /** DEPRECATED: Alias for getInstructionAst */
+  cached
+  deprecated Language::AST getInstructionAST(Instruction instruction) {
+    result = getInstructionAst(instruction)
   }
 
   cached
@@ -397,8 +420,19 @@ private module CachedForDebugging {
   string getTempVariableUniqueId(IRTempVariable var) {
     exists(TranslatedElement element |
       var = element.getTempVariable(_) and
-      result = element.getId() + ":" + getTempVariableTagId(var.getTag())
+      result = element.getId().toString() + ":" + getTempVariableTagId(var.getTag())
     )
+  }
+
+  cached
+  predicate instructionHasSortKeys(Instruction instruction, int key1, int key2) {
+    key1 = getInstructionTranslatedElement(instruction).getId() and
+    getInstructionTag(instruction) =
+      rank[key2](InstructionTag tag, string tagId |
+        tagId = getInstructionTagId(tag)
+      |
+        tag order by tagId
+      )
   }
 
   cached

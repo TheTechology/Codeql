@@ -4,6 +4,7 @@
  *              a global error handler, otherwise they may leak exception information.
  * @kind problem
  * @problem.severity warning
+ * @security-severity 7.5
  * @precision high
  * @id cs/web/missing-global-error-handler
  * @tags security
@@ -23,7 +24,7 @@ class Application_Error extends Method {
   }
 }
 
-from CustomErrorsXMLElement customError
+from CustomErrorsXmlElement customError
 where
   // `<customErrors>` must be set to "off" to be dangerous
   customError.getAttributeValue("mode").toLowerCase() = "off" and

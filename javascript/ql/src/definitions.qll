@@ -4,6 +4,7 @@
  */
 
 import javascript
+import IDEContextual
 private import Declarations.Declarations
 
 /**
@@ -24,7 +25,7 @@ private string refKind(RefExpr r) {
 /**
  * Gets a class, function or object literal `va` may refer to.
  */
-private ASTNode lookupDef(VarAccess va) {
+private AstNode lookupDef(VarAccess va) {
   exists(AbstractValue av | av = va.analyze().getAValue() |
     result = av.(AbstractClass).getClass() or
     result = av.(AbstractFunction).getFunction() or
@@ -36,7 +37,7 @@ private ASTNode lookupDef(VarAccess va) {
  * Holds if `va` is of kind `kind` and `def` is the unique class,
  * function or object literal it refers to.
  */
-private predicate variableDefLookup(VarAccess va, ASTNode def, string kind) {
+private predicate variableDefLookup(VarAccess va, AstNode def, string kind) {
   count(lookupDef(va)) = 1 and
   def = lookupDef(va) and
   kind = refKind(va)
@@ -65,7 +66,7 @@ private predicate variableDeclLookup(VarAccess va, VarDecl decl, string kind) {
  * For example, in the statement `var a = require("./a")`, the path expression
  * `"./a"` imports a module `a` in the same folder.
  */
-private predicate importLookup(ASTNode path, Module target, string kind) {
+private predicate importLookup(AstNode path, Module target, string kind) {
   kind = "I" and
   (
     exists(Import i |
@@ -83,7 +84,7 @@ private predicate importLookup(ASTNode path, Module target, string kind) {
 /**
  * Gets a node that may write the property read by `prn`.
  */
-private ASTNode getAWrite(DataFlow::PropRead prn) {
+private AstNode getAWrite(DataFlow::PropRead prn) {
   exists(DataFlow::AnalyzedNode base, DefiniteAbstractValue baseVal, string propName |
     base = prn.getBase() and
     propName = prn.getPropertyName() and
@@ -111,7 +112,7 @@ private ASTNode getAWrite(DataFlow::PropRead prn) {
  * only such property write. Parameter `kind` is always bound to `"M"`
  * at the moment.
  */
-private predicate propertyLookup(Expr prop, ASTNode write, string kind) {
+private predicate propertyLookup(Expr prop, AstNode write, string kind) {
   exists(DataFlow::PropRead prn | prop = prn.getPropertyNameExpr() |
     count(getAWrite(prn)) = 1 and
     write = getAWrite(prn) and
@@ -122,7 +123,7 @@ private predicate propertyLookup(Expr prop, ASTNode write, string kind) {
 /**
  * Holds if `ref` is an identifier that refers to a type declared at `decl`.
  */
-private predicate typeLookup(ASTNode ref, ASTNode decl, string kind) {
+private predicate typeLookup(AstNode ref, AstNode decl, string kind) {
   exists(TypeAccess typeAccess |
     ref = typeAccess.getIdentifier() and
     decl = typeAccess.getTypeName().getADefinition() and
@@ -133,7 +134,7 @@ private predicate typeLookup(ASTNode ref, ASTNode decl, string kind) {
 /**
  * Holds if `ref` is the callee name of an invocation of `decl`.
  */
-private predicate typedInvokeLookup(ASTNode ref, ASTNode decl, string kind) {
+private predicate typedInvokeLookup(AstNode ref, AstNode decl, string kind) {
   not variableDefLookup(ref, decl, _) and
   not propertyLookup(ref, decl, _) and
   exists(InvokeExpr invoke, Expr callee |
@@ -147,7 +148,7 @@ private predicate typedInvokeLookup(ASTNode ref, ASTNode decl, string kind) {
 /**
  * Holds if `ref` is a JSDoc type annotation referring to a class defined at `decl`.
  */
-private predicate jsdocTypeLookup(JSDocNamedTypeExpr ref, ASTNode decl, string kind) {
+private predicate jsdocTypeLookup(JSDocNamedTypeExpr ref, AstNode decl, string kind) {
   decl = ref.getClass().getAstNode() and
   kind = "T"
 }
@@ -162,7 +163,7 @@ private predicate jsdocTypeLookup(JSDocNamedTypeExpr ref, ASTNode decl, string k
  *  - `"I"` for imports
  */
 cached
-ASTNode definitionOf(Locatable e, string kind) {
+AstNode definitionOf(Locatable e, string kind) {
   variableDefLookup(e, result, kind)
   or
   // prefer definitions over declarations
@@ -178,11 +179,3 @@ ASTNode definitionOf(Locatable e, string kind) {
   or
   jsdocTypeLookup(e, result, kind)
 }
-
-/**
- * Returns an appropriately encoded version of a filename `name`
- * passed by the VS Code extension in order to coincide with the
- * output of `.getFile()` on locatable entities.
- */
-cached
-File getEncodedFile(string name) { result.getAbsolutePath().replaceAll(":", "_") = name }

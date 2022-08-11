@@ -4,10 +4,12 @@
  *              characters is vulnerable to insertion of malicious code.
  * @kind problem
  * @problem.severity error
- * @precision high
+ * @security-severity 8.8
+ * @precision medium
  * @id java/concatenated-sql-query
  * @tags security
  *       external/cwe/cwe-089
+ *       external/cwe/cwe-564
  */
 
 import java

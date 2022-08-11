@@ -4,11 +4,13 @@
  *              and "data:" suggests a logic error or even a security vulnerability.
  * @kind problem
  * @problem.severity warning
+ * @security-severity 7.8
  * @precision high
  * @id js/incomplete-url-scheme-check
  * @tags security
  *       correctness
  *       external/cwe/cwe-020
+ *       external/cwe/cwe-184
  */
 
 import javascript
@@ -75,7 +77,7 @@ DataFlow::Node schemeCheck(DataFlow::Node nd, DangerousScheme scheme) {
   exists(DataFlow::MethodCallNode stringop |
     stringop.getMethodName().matches("trim%") or
     stringop.getMethodName().matches("to%Case") or
-    stringop.getMethodName() = "replace"
+    stringop.getMethodName() = ["replace", "replaceAll"]
   |
     result = schemeCheck(stringop, scheme) and
     nd = stringop.getReceiver()

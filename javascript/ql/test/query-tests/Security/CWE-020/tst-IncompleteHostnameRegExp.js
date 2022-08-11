@@ -9,7 +9,7 @@
 	/^http:\/\/(?:.+)\\.test\\.example.com\//; // NOT OK
 	/^http:\/\/test.example.com\/(?:.*)/; // OK
 	new RegExp("^http://test.example.com"); // NOT OK
-	s.match("^http://test.example.com"); // NOT OK
+	if (s.match("^http://test.example.com")) {} // NOT OK
 
 	function id(e) { return e; }
 	new RegExp(id(id(id("^http://test.example.com")))); // NOT OK
@@ -50,9 +50,9 @@
 	var primary = 'example.com$';
 	new RegExp('test.' + primary); // NOT OK, but not detected
 
-	new RegExp('test.' + 'example.com$'); // NOT OK, but not detected
+	new RegExp('test.' + 'example.com$'); // NOT OK
 
-	new RegExp('^http://test\.example.com'); // NOT OK, but flagged by js/useless-regexp-character-escape
+	new RegExp('^http://test\.example.com'); // NOT OK
 
 	/^http:\/\/(..|...)\.example\.com\/index\.html/; // OK, wildcards are intentional
 	/^http:\/\/.\.example\.com\/index\.html/; // OK, the wildcard is intentional
